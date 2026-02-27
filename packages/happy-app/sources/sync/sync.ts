@@ -2310,7 +2310,7 @@ async function syncInit(credentials: AuthCredentials, restore: boolean) {
             return API_ENDPOINT;
         }
     })();
-    apiSocket.initialize({ endpoint: socketEndpoint, token: credentials.token }, encryption);
+    apiSocket.initialize({ endpoint: socketEndpoint, httpEndpoint: API_ENDPOINT, token: credentials.token }, encryption);
 
     // Wire socket status to storage
     apiSocket.onStatusChange((status) => {

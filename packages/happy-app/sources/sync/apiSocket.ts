@@ -7,7 +7,8 @@ import { Encryption } from './encryption/encryption';
 //
 
 export interface SyncSocketConfig {
-    endpoint: string;
+    endpoint: string;      // Socket.IO 连接用，只含 origin（如 http://host）
+    httpEndpoint: string;  // HTTP 请求用，含完整路径（如 http://host/api）
     token: string;
 }
 
@@ -174,7 +175,7 @@ class ApiSocket {
             throw new Error('No authentication credentials');
         }
 
-        const url = `${this.config.endpoint}${path}`;
+        const url = `${this.config.httpEndpoint}${path}`;
         const headers = {
             'Authorization': `Bearer ${credentials.token}`,
             ...options?.headers
