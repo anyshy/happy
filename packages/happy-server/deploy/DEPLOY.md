@@ -49,6 +49,22 @@ docker compose up -d --build
 - happy-server（API，宿主机默认 `3000`）
 - happy-webapp（Web 页面，宿主机默认 `8080`）
 
+### 可选：手动打包镜像（保留原有习惯）
+
+如果你希望先显式打包，再启动 compose，可在仓库根目录执行：
+
+```bash
+docker build -f Dockerfile.server -t happy-server:latest .
+docker build -f Dockerfile.webapp -t happy-webapp:latest --build-arg HAPPY_SERVER_URL=http://<服务器IP>:3000 .
+```
+
+然后回到部署目录启动（可不加 `--build`）：
+
+```bash
+cd packages/happy-server/deploy
+docker compose up -d
+```
+
 ---
 
 ## 3. 初始化 MinIO Bucket（首次必做）
