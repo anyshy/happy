@@ -2,8 +2,12 @@
 
 ## 环境要求
 
-- Docker & Docker Compose
-- 服务器开放端口：3000（API）、9000/9001（MinIO）
+- Docker Engine + Docker Compose v2
+- 服务器开放端口：`3000`（API）、`9000/9001`（MinIO）
+
+## 目录约定
+
+本文档中的 `docker compose` 命令默认在 `packages/happy-server/deploy` 目录执行。
 
 ## 服务说明
 
@@ -12,49 +16,41 @@
 | postgres | postgres:16 | 5432 | 主数据库 |
 | redis | redis:7 | 6379 | 缓存 / 事件总线 |
 | minio | minio/minio | 9000/9001 | 对象存储（图片等文件） |
-| happy-server | happy-server:latest | 3000 | 应用服务 |
+| happy-server | happy-server:latest | 3000 -> 3005 | 应用服务（宿主机 3000 映射容器 3005） |
 
 ---
 
 ## 首次部署
 
-### 1. 构建镜像
-
-在项目根目录执行：
+### 1. 构建镜像（项目根目录）
 
 ```bash
-docker build -t happy-server:latest .
+docker build -f Dockerfile.server -t happy-server:latest .
 ```
 
 ### 2. 启动所有服务
 
 ```bash
-cd deploy
+cd packages/happy-server/deploy
 docker compose up -d
 ```
 
-### 3. 初始化 MinIO Bucket
-
-首次启动后需要手动创建 bucket：
+### 3. 初始化 MinIO Bucket（首次必做）
 
 ```bash
-docker exec happy-minio mc alias set local http://localhost:9000 minioadmin minioadmin
-docker exec happy-minio mc mb local/happy
-docker exec happy-minio mc anonymous set public local/happy/public
+docker run --rm --network container:happy-minio --entrypoint /bin/sh minio/mc -c "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb -p local/happy || true && mc anonymous set download local/happy/public"
 ```
 
-### 4. 重启 happy-server
+### 4. 执行数据库迁移
 
-bucket 创建完成后重启应用，确保 `loadFiles()` 检查通过：
+```bash
+docker exec -w /repo/packages/happy-server happy-server npx prisma migrate deploy
+```
+
+### 5. 重启应用
 
 ```bash
 docker compose restart happy-server
-```
-
-### 5. 执行数据库迁移
-
-```bash
-docker exec happy-server yarn migrate
 ```
 
 ---
@@ -62,11 +58,15 @@ docker exec happy-server yarn migrate
 ## 更新部署
 
 ```bash
-# 1. 重新构建镜像
-docker build -t happy-server:latest .
+# 1. 在项目根目录重新构建镜像
+docker build -f Dockerfile.server -t happy-server:latest .
 
-# 2. 重启应用（数据库和 MinIO 不需要重启）
+# 2. 回到部署目录，仅重建应用容器
+cd packages/happy-server/deploy
 docker compose up -d --no-deps happy-server
+
+# 3. 若包含数据库变更，执行迁移
+docker exec -w /repo/packages/happy-server happy-server npx prisma migrate deploy
 ```
 
 ---
@@ -76,19 +76,20 @@ docker compose up -d --no-deps happy-server
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | NODE_ENV | production | 运行环境 |
-| PORT | 3005 | 内部监听端口 |
-| SEED | yansyhyn | 随机种子，用于生成唯一 key |
-| DATABASE_URL | - | PostgreSQL 连接串 |
-| REDIS_URL | - | Redis 连接串 |
+| PORT | 3005 | 容器内监听端口（由 compose 映射到宿主机 3000） |
+| HANDY_MASTER_SECRET | 示例值（必须修改） | 认证/加密主密钥 |
+| DATABASE_URL | postgresql://postgres:postgres@postgres:5432/happy-server | PostgreSQL 连接串 |
+| REDIS_URL | redis://redis:6379 | Redis 连接串 |
 | S3_HOST | minio | MinIO 主机名（容器内用服务名） |
 | S3_PORT | 9000 | MinIO 端口 |
 | S3_USE_SSL | false | 是否启用 SSL |
 | S3_ACCESS_KEY | minioadmin | MinIO 访问密钥 |
 | S3_SECRET_KEY | minioadmin | MinIO 密钥 |
 | S3_BUCKET | happy | Bucket 名称 |
-| S3_PUBLIC_URL | http://localhost:9000/happy | 文件公开访问地址 |
+| S3_PUBLIC_URL | http://localhost:9000/happy | 文件公开访问地址（生产环境应改为公网可访问地址） |
+| SEED | 示例值 | 兼容旧配置，当前版本通常不使用 |
 
-> 生产环境建议修改 `SEED`、`S3_ACCESS_KEY`、`S3_SECRET_KEY`、`POSTGRES_PASSWORD` 为强密码。
+> 生产环境请至少修改：`POSTGRES_PASSWORD`、`HANDY_MASTER_SECRET`、`S3_ACCESS_KEY`、`S3_SECRET_KEY`。
 
 ---
 
@@ -115,7 +116,7 @@ docker compose down -v
 
 ## MinIO 控制台
 
-浏览器访问 `http://<服务器IP>:9001`，用以下账号登录：
+浏览器访问 `http://<服务器IP>:9001`，默认账号：
 
 - 用户名：`minioadmin`
 - 密码：`minioadmin`

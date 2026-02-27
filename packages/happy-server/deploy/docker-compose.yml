@@ -58,7 +58,7 @@ services:
       S3_PUBLIC_URL: http://localhost:9000/happy
       HANDY_MASTER_SECRET: "560d62851cfb384e6ad5f6d519b3ff8ca18625a113358d8c9dc4a2b71f4cd1f3"
     ports:
-      - "3000:3000"
+      - "3000:3005"
     restart: unless-stopped
 
 volumes:
