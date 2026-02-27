@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: happy-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: happy-server
+    volumes:
+      - happy_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: happy-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - happy_redisdata:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio
+    container_name: happy-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - happy_miniodata:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    restart: unless-stopped
+
+  happy-server:
+    image: happy-server:latest
+    container_name: happy-server
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      SEED: 560d62851cfb384e6ad5f6d519b3ff8ca18625a113358d8c9dc4a2b71f4cd1f3
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/happy-server
+      REDIS_URL: redis://redis:6379
+      S3_HOST: minio
+      S3_PORT: "9000"
+      S3_USE_SSL: "false"
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: happy
+      S3_PUBLIC_URL: http://localhost:9000/happy
+      HANDY_MASTER_SECRET: "560d62851cfb384e6ad5f6d519b3ff8ca18625a113358d8c9dc4a2b71f4cd1f3"
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  happy_pgdata:
+  happy_redisdata:
+  happy_miniodata:
