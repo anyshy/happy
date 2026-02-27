@@ -1,122 +1,121 @@
-# Happy Server 部署说明
+# Happy 一体化 Docker Compose 部署说明
 
 ## 环境要求
 
 - Docker Engine + Docker Compose v2
-- 服务器开放端口：`3000`（API）、`9000/9001`（MinIO）
+- 服务器开放端口：`3000`（API）、`8080`（Web）、`9000/9001`（MinIO）
 
 ## 目录约定
 
 本文档中的 `docker compose` 命令默认在 `packages/happy-server/deploy` 目录执行。
 
-## 服务说明
+## 重要说明
 
-| 服务 | 镜像 | 端口 | 说明 |
-|------|------|------|------|
-| postgres | postgres:16 | 5432 | 主数据库 |
-| redis | redis:7 | 6379 | 缓存 / 事件总线 |
-| minio | minio/minio | 9000/9001 | 对象存储（图片等文件） |
-| happy-server | happy-server:latest | 3000 -> 3005 | 应用服务（宿主机 3000 映射容器 3005） |
+- `http://<服务器IP>:3000/` 是后端 API 根路径，返回 `Welcome to Happy Server!` 属于正常现象。
+- 浏览器访问 API 时出现 `GET /favicon.ico 404` 是正常行为，不影响业务请求。
+- 完整 Web 界面请访问 `http://<服务器IP>:8080/`（由 `happy-webapp` 服务提供）。
 
 ---
 
-## 首次部署
+## 1. 准备环境变量
 
-### 1. 构建镜像（项目根目录）
-
-```bash
-docker build -f Dockerfile.server -t happy-server:latest .
-```
-
-### 2. 启动所有服务
+先复制示例文件：
 
 ```bash
 cd packages/happy-server/deploy
-docker compose up -d
+cp .env.example .env
 ```
 
-### 3. 初始化 MinIO Bucket（首次必做）
+至少修改 `.env` 里的：
+
+- `HANDY_MASTER_SECRET`
+- `HAPPY_SERVER_URL`（浏览器访问 Web 时前端请求的 API 地址）
+- `API_PUBLIC_URL`、`S3_PUBLIC_URL`（建议改成公网可访问地址）
+
+---
+
+## 2. 启动整套服务（后端 + Web）
+
+```bash
+cd packages/happy-server/deploy
+docker compose up -d --build
+```
+
+服务包含：
+
+- postgres
+- redis
+- minio
+- happy-server（API，宿主机默认 `3000`）
+- happy-webapp（Web 页面，宿主机默认 `8080`）
+
+---
+
+## 3. 初始化 MinIO Bucket（首次必做）
 
 ```bash
 docker run --rm --network container:happy-minio --entrypoint /bin/sh minio/mc -c "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb -p local/happy || true && mc anonymous set download local/happy/public"
 ```
 
-### 4. 执行数据库迁移
+如果你在 `.env` 改了 MinIO 账号或 Bucket，请把上面命令中的 `minioadmin/minioadmin/happy` 同步改掉。
+
+---
+
+## 4. 执行数据库迁移
 
 ```bash
 docker exec -w /repo/packages/happy-server happy-server npx prisma migrate deploy
 ```
 
-### 5. 重启应用
+---
+
+## 5. 连通性检查
 
 ```bash
-docker compose restart happy-server
+# API 健康检查
+curl http://<服务器IP>:3000/
 ```
+
+浏览器访问：
+
+- Web 页面：`http://<服务器IP>:8080/`
+- MinIO 控制台：`http://<服务器IP>:9001/`
 
 ---
 
 ## 更新部署
 
 ```bash
-# 1. 在项目根目录重新构建镜像
-docker build -f Dockerfile.server -t happy-server:latest .
+# 重建并更新整套服务
+docker compose up -d --build
 
-# 2. 回到部署目录，仅重建应用容器
-cd packages/happy-server/deploy
-docker compose up -d --no-deps happy-server
+# 仅更新应用层（后端+web，不动数据库/缓存）
+docker compose up -d --build --no-deps happy-server happy-webapp
 
-# 3. 若包含数据库变更，执行迁移
+# 若包含数据库变更，执行迁移
 docker exec -w /repo/packages/happy-server happy-server npx prisma migrate deploy
 ```
-
----
-
-## 环境变量说明
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| NODE_ENV | production | 运行环境 |
-| PORT | 3005 | 容器内监听端口（由 compose 映射到宿主机 3000） |
-| HANDY_MASTER_SECRET | 示例值（必须修改） | 认证/加密主密钥 |
-| DATABASE_URL | postgresql://postgres:postgres@postgres:5432/happy-server | PostgreSQL 连接串 |
-| REDIS_URL | redis://redis:6379 | Redis 连接串 |
-| S3_HOST | minio | MinIO 主机名（容器内用服务名） |
-| S3_PORT | 9000 | MinIO 端口 |
-| S3_USE_SSL | false | 是否启用 SSL |
-| S3_ACCESS_KEY | minioadmin | MinIO 访问密钥 |
-| S3_SECRET_KEY | minioadmin | MinIO 密钥 |
-| S3_BUCKET | happy | Bucket 名称 |
-| S3_PUBLIC_URL | http://localhost:9000/happy | 文件公开访问地址（生产环境应改为公网可访问地址） |
-| SEED | 示例值 | 兼容旧配置，当前版本通常不使用 |
-
-> 生产环境请至少修改：`POSTGRES_PASSWORD`、`HANDY_MASTER_SECRET`、`S3_ACCESS_KEY`、`S3_SECRET_KEY`。
 
 ---
 
 ## 常用运维命令
 
 ```bash
-# 查看所有服务状态
+# 查看服务状态
 docker compose ps
 
-# 查看应用日志
+# 查看后端日志
 docker compose logs -f happy-server
 
-# 查看所有服务日志
+# 查看 Web 日志
+docker compose logs -f happy-webapp
+
+# 查看所有日志
 docker compose logs -f
 
-# 停止所有服务
+# 停止服务
 docker compose down
 
-# 停止并清除数据（慎用）
+# 停止并清理卷（慎用）
 docker compose down -v
 ```
-
----
-
-## MinIO 控制台
-
-浏览器访问 `http://<服务器IP>:9001`，默认账号：
-
-- 用户名：`minioadmin`
-- 密码：`minioadmin`
