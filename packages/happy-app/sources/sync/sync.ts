@@ -2300,8 +2300,17 @@ async function syncInit(credentials: AuthCredentials, restore: boolean) {
     initializeTracking(encryption.anonID);
 
     // Initialize socket connection
+    // Socket.IO 把 endpoint 的路径部分当作 namespace，所以只传 origin
     const API_ENDPOINT = getServerUrl();
-    apiSocket.initialize({ endpoint: API_ENDPOINT, token: credentials.token }, encryption);
+    const socketEndpoint = (() => {
+        try {
+            const u = new URL(API_ENDPOINT);
+            return u.origin;
+        } catch {
+            return API_ENDPOINT;
+        }
+    })();
+    apiSocket.initialize({ endpoint: socketEndpoint, token: credentials.token }, encryption);
 
     // Wire socket status to storage
     apiSocket.onStatusChange((status) => {
