@@ -61,7 +61,7 @@ services:
       dockerfile: Dockerfile.webapp
       args:
         # 浏览器访问 API 的地址，走 nginx /api 路径，无需额外端口
-        HAPPY_SERVER_URL: ${HAPPY_SERVER_URL:-http://${HOST_IP:-localhost}/api}
+        HAPPY_SERVER_URL: ${HAPPY_SERVER_URL:-http://${HOST_IP:-localhost}}
         POSTHOG_API_KEY: ${POSTHOG_API_KEY:-}
         REVENUE_CAT_STRIPE: ${REVENUE_CAT_STRIPE:-}
     image: happy-webapp:latest
