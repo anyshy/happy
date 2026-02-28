@@ -28,7 +28,7 @@ export function AuthProvider({ children, initialCredentials }: { children: React
         const newCredentials: AuthCredentials = { token, secret };
         const success = await TokenStorage.setCredentials(newCredentials);
         if (success) {
-            await syncCreate(newCredentials);
+            syncCreate(newCredentials);
             setCredentials(newCredentials);
             setIsAuthenticated(true);
         } else {
