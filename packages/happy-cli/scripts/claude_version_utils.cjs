@@ -493,9 +493,13 @@ function runClaudeCli(cliPath) {
         // Note: Interceptors won't work with binary files, but that's acceptable
         // as binary files are self-contained and don't need interception
         const args = process.argv.slice(2);
-        const child = spawn(cliPath, args, {
+        const spawnPath = process.platform === 'win32' && !path.extname(cliPath)
+            ? cliPath + '.cmd'
+            : cliPath;
+        const child = spawn(spawnPath, args, {
             stdio: 'inherit',
-            env: process.env
+            env: process.env,
+            shell: process.platform === 'win32'
         });
         child.on('exit', (code) => {
             process.exit(code || 0);
