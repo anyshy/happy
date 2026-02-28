@@ -91,15 +91,15 @@ export async function startApi() {
     kvRoutes(typed);
     v3SessionRoutes(typed);
 
-    // Start HTTP 
+    // Start Socket (must be before listen)
+    startSocket(typed);
+
+    // Start HTTP
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
     await app.listen({ port, host: '0.0.0.0' });
     onShutdown('api', async () => {
         await app.close();
     });
-
-    // Start Socket
-    startSocket(typed);
 
     // End
     log('API ready on port http://localhost:' + port);
