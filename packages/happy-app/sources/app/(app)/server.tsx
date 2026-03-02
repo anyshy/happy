@@ -89,7 +89,7 @@ export default function ServerConfigScreen() {
             setIsValidating(true);
             setError(null);
             
-            const response = await fetch(url.replace(/\/$/, '') + '/api', {
+            const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Accept': 'text/plain'
